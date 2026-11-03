@@ -1,0 +1,36 @@
+# ansible/playbooks/02-models.yml
+- hosts: host
+  become: true
+  vars:
+    model_repo: Qwen/Qwen2.5-0.5B
+    model_subdir: qwen2.5-0.5b
+  tasks:
+    - name: NFS client
+      ansible.builtin.apt: { name: nfs-common, state: present }
+      tags: [mount]
+
+    - name: Mount the model export on the Docker host
+      ansible.posix.mount:
+        path: "{{ models_dir }}"
+        src: "{{ nfs_export }}"
+        fstype: nfs
+        opts: "{{ nfs_mount_opts | default('nfsvers=4.1,hard,noatime,nofail,_netdev') }}"   # nofail: boot continues if the server is down
+        state: mounted
+      tags: [mount]
+
+    - name: Python venv support (Debian keeps it in a separate package)
+      ansible.builtin.apt: { name: python3-venv, state: present }
+      tags: [download]
+
+    - name: Hugging Face CLI in a venv
+      ansible.builtin.pip:
+        name: huggingface_hub
+        virtualenv: /opt/hf
+        virtualenv_command: python3 -m venv
+      tags: [download]
+
+    - name: Download weights once
+      ansible.builtin.command: /opt/hf/bin/hf download {{ model_repo }} --local-dir {{ models_dir }}/{{ model_subdir }}
+      args:
+        creates: "{{ models_dir }}/{{ model_subdir }}/config.json"
+      tags: [download]

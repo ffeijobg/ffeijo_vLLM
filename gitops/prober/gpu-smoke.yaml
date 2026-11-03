@@ -1,0 +1,17 @@
+# gitops/prober/gpu-smoke.yaml (apply by hand; it is a one-off test, not a managed workload)
+apiVersion: v1
+kind: Pod
+metadata: { name: gpu-smoke, namespace: default }
+spec:
+  restartPolicy: Never
+  runtimeClassName: nvidia
+  nodeSelector: { workload: inference }
+  tolerations:
+    - { key: nvidia.com/gpu, operator: Exists, effect: NoSchedule }
+  containers:
+    - name: cuda
+      image: nvcr.io/nvidia/cuda:12.4.1-base-ubuntu22.04   # any current CUDA base tag works
+      command: ["nvidia-smi"]
+      resources:
+        limits:
+          nvidia.com/gpu: 1
