@@ -28,3 +28,21 @@ resource "kubernetes_manifest" "vllm_app" {
     }
   }
 }
+
+resource "kubernetes_manifest" "prober_app" {
+  depends_on = [helm_release.argocd]
+  manifest = {
+    apiVersion = "argoproj.io/v1alpha1"
+    kind       = "Application"
+    metadata   = { name = "llm-prober", namespace = "argocd" }
+    spec = {
+      project = "default"
+      source = { repoURL = var.gitops_repo, targetRevision = "main", path = "gitops/prober" }
+      destination = { server = "https://kubernetes.default.svc", namespace = "inference" }
+      syncPolicy = {
+        automated   = { prune = true, selfHeal = true }
+        syncOptions = ["CreateNamespace=true"]
+      }
+    }
+  }
+}

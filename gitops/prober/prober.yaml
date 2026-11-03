@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: llm-prober, namespace: inference, labels: { app: llm-prober } }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: llm-prober } }
+  template:
+    metadata: { labels: { app: llm-prober } }
+    spec:
+      enableServiceLinks: false                     # no injected *_PORT variables from other Services
+      nodeSelector: { workload: apps }              # a CPU worker: the image was loaded only into those nodes (Step 3.3)
+      containers:
+        - name: prober
+          image: llm-prober:0.1.0                   # the local image from Step 3.3; use your registry path if you pushed it
+          imagePullPolicy: IfNotPresent
+          args: ["--serve", "9105", "--interval", "15"]
+          env:
+            - { name: ENDPOINT, value: "http://vllm.inference.svc:8000" }
+          ports: [{ containerPort: 9105, name: metrics }]
+---
+apiVersion: v1
+kind: Service
+metadata: { name: llm-prober, namespace: inference, labels: { app: llm-prober } }
+spec:
+  selector: { app: llm-prober }
+  ports: [{ name: metrics, port: 9105, targetPort: metrics }]
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata: { name: llm-prober, namespace: inference, labels: { release: kube-prometheus-stack } }
+spec:
+  selector: { matchLabels: { app: llm-prober } }
+  endpoints: [{ port: metrics, interval: 15s }]
