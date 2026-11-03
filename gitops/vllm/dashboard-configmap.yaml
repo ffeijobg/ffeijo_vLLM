@@ -1,0 +1,178 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: llm-dashboard
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+data:
+  llm-lab.json: |
+    {
+      "uid": "llm-lab",
+      "title": "LLM lab: vLLM, GPU and prober",
+      "tags": [
+        "llm",
+        "lab"
+      ],
+      "timezone": "browser",
+      "schemaVersion": 39,
+      "version": 1,
+      "refresh": "30s",
+      "time": {
+        "from": "now-1h",
+        "to": "now"
+      },
+      "panels": [
+        {
+          "id": 1,
+          "title": "Probe availability (5m)",
+          "type": "stat",
+          "gridPos": {
+            "x": 0,
+            "y": 0,
+            "w": 6,
+            "h": 5
+          },
+          "targets": [
+            {
+              "expr": "sum(rate(llm_probe_requests_total{result=\"ok\"}[5m])) / sum(rate(llm_probe_requests_total[5m]))",
+              "legendFormat": "availability",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percentunit"
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ]
+            },
+            "colorMode": "value"
+          }
+        },
+        {
+          "id": 2,
+          "title": "p95 time to first token and inter-token latency",
+          "type": "timeseries",
+          "gridPos": {
+            "x": 6,
+            "y": 0,
+            "w": 18,
+            "h": 8
+          },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.95, sum by (le) (rate(vllm:time_to_first_token_seconds_bucket[5m])))",
+              "legendFormat": "p95 TTFT",
+              "refId": "A"
+            },
+            {
+              "expr": "histogram_quantile(0.95, sum by (le) (rate(vllm:inter_token_latency_seconds_bucket[5m])))",
+              "legendFormat": "p95 inter-token",
+              "refId": "B"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s"
+            },
+            "overrides": []
+          }
+        },
+        {
+          "id": 3,
+          "title": "Queue depth, running requests, KV cache %",
+          "type": "timeseries",
+          "gridPos": {
+            "x": 0,
+            "y": 8,
+            "w": 12,
+            "h": 8
+          },
+          "targets": [
+            {
+              "expr": "vllm:num_requests_waiting",
+              "legendFormat": "waiting",
+              "refId": "A"
+            },
+            {
+              "expr": "vllm:num_requests_running",
+              "legendFormat": "running",
+              "refId": "B"
+            },
+            {
+              "expr": "100 * vllm:kv_cache_usage_perc",
+              "legendFormat": "KV cache %",
+              "refId": "C"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {},
+            "overrides": []
+          }
+        },
+        {
+          "id": 4,
+          "title": "GPU memory used and GPU utilisation (%)",
+          "type": "timeseries",
+          "gridPos": {
+            "x": 12,
+            "y": 8,
+            "w": 12,
+            "h": 8
+          },
+          "targets": [
+            {
+              "expr": "100 * DCGM_FI_DEV_FB_USED / (DCGM_FI_DEV_FB_USED + DCGM_FI_DEV_FB_FREE)",
+              "legendFormat": "memory used %",
+              "refId": "A"
+            },
+            {
+              "expr": "DCGM_FI_DEV_GPU_UTIL",
+              "legendFormat": "GPU util %",
+              "refId": "B"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent"
+            },
+            "overrides": []
+          }
+        },
+        {
+          "id": 5,
+          "title": "Probe latency (p95) and probe time to first token",
+          "type": "timeseries",
+          "gridPos": {
+            "x": 0,
+            "y": 16,
+            "w": 24,
+            "h": 8
+          },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.95, sum by (le) (rate(llm_probe_duration_seconds_bucket[5m])))",
+              "legendFormat": "probe p95 duration",
+              "refId": "A"
+            },
+            {
+              "expr": "llm_probe_ttft_seconds",
+              "legendFormat": "probe TTFT (last)",
+              "refId": "B"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s"
+            },
+            "overrides": []
+          }
+        }
+      ]
+    }
