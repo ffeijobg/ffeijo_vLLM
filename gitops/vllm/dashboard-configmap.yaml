@@ -96,17 +96,17 @@ data:
           },
           "targets": [
             {
-              "expr": "vllm:num_requests_waiting",
+              "expr": "sum(vllm:num_requests_waiting)",
               "legendFormat": "waiting",
               "refId": "A"
             },
             {
-              "expr": "vllm:num_requests_running",
+              "expr": "sum(vllm:num_requests_running)",
               "legendFormat": "running",
               "refId": "B"
             },
             {
-              "expr": "100 * vllm:kv_cache_usage_perc",
+              "expr": "100 * max(vllm:kv_cache_usage_perc)",
               "legendFormat": "KV cache %",
               "refId": "C"
             }
@@ -128,12 +128,12 @@ data:
           },
           "targets": [
             {
-              "expr": "100 * DCGM_FI_DEV_FB_USED / (DCGM_FI_DEV_FB_USED + DCGM_FI_DEV_FB_FREE)",
+              "expr": "100 * max(DCGM_FI_DEV_FB_USED) / (max(DCGM_FI_DEV_FB_USED) + max(DCGM_FI_DEV_FB_FREE))",
               "legendFormat": "memory used %",
               "refId": "A"
             },
             {
-              "expr": "DCGM_FI_DEV_GPU_UTIL",
+              "expr": "max(DCGM_FI_DEV_GPU_UTIL)",
               "legendFormat": "GPU util %",
               "refId": "B"
             }
@@ -147,7 +147,7 @@ data:
         },
         {
           "id": 5,
-          "title": "Probe latency (p95) and probe time to first token",
+          "title": "Probe latency (mean) and probe time to first token",
           "type": "timeseries",
           "gridPos": {
             "x": 0,
@@ -157,12 +157,12 @@ data:
           },
           "targets": [
             {
-              "expr": "histogram_quantile(0.95, sum by (le) (rate(llm_probe_duration_seconds_bucket[5m])))",
-              "legendFormat": "probe p95 duration",
+              "expr": "sum(rate(llm_probe_duration_seconds_sum[5m])) / sum(rate(llm_probe_duration_seconds_count[5m]))",
+              "legendFormat": "probe mean duration",
               "refId": "A"
             },
             {
-              "expr": "llm_probe_ttft_seconds",
+              "expr": "max(llm_probe_ttft_seconds)",
               "legendFormat": "probe TTFT (last)",
               "refId": "B"
             }
