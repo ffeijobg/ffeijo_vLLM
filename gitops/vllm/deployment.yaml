@@ -15,7 +15,7 @@ spec:
         - { key: nvidia.com/gpu, operator: Exists, effect: NoSchedule }
       containers:
         - name: vllm
-          image: vllm/vllm-openai:<pinned-tag>      # the tag you chose above, for example v0.33.0; never latest
+          image: vllm/vllm-openai:v0.33.0      # the tag you chose above, for example v0.33.0; never latest
           imagePullPolicy: IfNotPresent
           args:
             - --model=/models/qwen2.5-0.5b
