@@ -9,20 +9,23 @@ spec:
   template:
     metadata: { labels: { app: vllm } }
     spec:
+      enableServiceLinks: false         # do not inject VLLM_PORT=tcp://... and other service variables (vLLM would crash on them)
       runtimeClassName: nvidia
       nodeSelector: { workload: inference }
       tolerations:
         - { key: nvidia.com/gpu, operator: Exists, effect: NoSchedule }
       containers:
         - name: vllm
-          image: vllm/vllm-openai:v0.33.0      # the tag you chose above, for example v0.33.0; never latest
+          image: vllm/vllm-openai:v0.33.0           # the tag you pulled; never latest
           imagePullPolicy: IfNotPresent
           args:
-            - --model=/models/qwen2.5-0.5b
+            - /models/qwen2.5-0.5b                  # model path as the first argument (the image runs `vllm serve`)
             - --served-model-name=lab-model
             - --max-model-len=4096
             - --gpu-memory-utilization=0.80
             - --port=8000
+          env:
+            - { name: VLLM_USE_FLASHINFER_SAMPLER, value: "0" }   # silences a warning: this GPU has only 6 SMs
           ports: [{ containerPort: 8000, name: http }]
           resources:
             limits: { nvidia.com/gpu: 1, memory: 12Gi }
@@ -33,7 +36,7 @@ spec:
           startupProbe:
             httpGet: { path: /health, port: http }
             periodSeconds: 10
-            failureThreshold: 60                      # allows up to 10 minutes to load
+            failureThreshold: 60                    # allows up to 10 minutes to load
           readinessProbe:
             httpGet: { path: /health, port: http }
             periodSeconds: 10
