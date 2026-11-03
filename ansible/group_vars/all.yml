@@ -1,0 +1,4 @@
+cluster_name: gpu-lab
+models_dir: /srv/models
+nfs_export: "192.168.68.90:/srv/nfs/models"  # export on bond0 (192.168.68.0/22) that holds model weights
+kind_version: "<pin>"                        # a kind release that publishes your node image; see Step 2.2
