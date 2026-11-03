@@ -1,4 +1,11 @@
 cluster_name: gpu-lab
 models_dir: /srv/models
-nfs_export: "192.168.68.90:/srv/nfs/models"  # export on bond0 (192.168.68.0/22) that holds model weights
-kind_version: "<pin>"                        # a kind release that publishes your node image; see Step 2.2
+nfs_export: "192.168.68.90:/media/raid12/nfs/models"
+kind_version: "0.33.0"
+kubectl_version: "1.34.0"
+helm_version: "3.15.0"
+k6_version: "0.52.0"
+docker_data_root: /var/lib/docker
+docker_log_driver: json-file
+docker_log_max_size: 50m
+docker_log_max_file: "3"

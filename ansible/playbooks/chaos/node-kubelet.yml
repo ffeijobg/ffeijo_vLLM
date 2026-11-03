@@ -1,0 +1,6 @@
+# ansible/playbooks/chaos/node-kubelet.yml
+# usage: ansible-playbook -i inventory.ini playbooks/chaos/node-kubelet.yml -e node=gpu-lab-worker2 -e action=stop
+- hosts: host
+  tasks:
+    - name: "{{ action }} kubelet inside {{ node }}"
+      ansible.builtin.command: docker exec {{ node }} systemctl {{ action }} kubelet

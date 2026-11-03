@@ -1,0 +1,10 @@
+- name: Prepare the GPU Docker host
+  hosts: host
+  become: true
+  gather_facts: true
+  roles:
+    - { role: common, tags: [host-base, never] }
+    - { role: docker, tags: [host-base, never] }
+    - { role: nvidia, tags: [gpu] }
+    - { role: kind,   tags: [tools] }
+    - { role: tools,  tags: [tools] }

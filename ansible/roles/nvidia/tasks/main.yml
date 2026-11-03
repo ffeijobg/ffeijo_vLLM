@@ -1,0 +1,45 @@
+# ansible/roles/nvidia/tasks/main.yml
+- name: Driver must already work on the host
+  ansible.builtin.command: nvidia-smi --query-gpu=name,memory.total,driver_version --format=csv,noheader
+  register: smi
+  changed_when: false
+
+- name: Record GPU model and VRAM (you need VRAM to size the model)
+  ansible.builtin.debug:
+    var: smi.stdout
+
+- name: Add NVIDIA container toolkit signing key
+  ansible.builtin.shell: >
+    curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey |
+    gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
+  args:
+    creates: /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
+
+- name: Add NVIDIA container toolkit apt repo
+  ansible.builtin.shell: >
+    curl -s -L https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list |
+    sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g'
+    > /etc/apt/sources.list.d/nvidia-container-toolkit.list
+  args:
+    creates: /etc/apt/sources.list.d/nvidia-container-toolkit.list
+
+- name: Install the container toolkit
+  ansible.builtin.apt:
+    name: nvidia-container-toolkit
+    state: present
+    update_cache: true
+
+- name: Read Docker's default runtime
+  ansible.builtin.command: docker info --format "{% raw %}{{.DefaultRuntime}}{% endraw %}"
+  register: rt
+  changed_when: false
+
+- name: Make nvidia the default runtime and enable CDI
+  ansible.builtin.command: nvidia-ctk runtime configure --runtime=docker --set-as-default --cdi.enabled
+  when: rt.stdout != 'nvidia'
+  notify: restart docker
+
+- name: Allow GPU injection through volume mounts (what nvkind relies on)
+  ansible.builtin.command: nvidia-ctk config --set accept-nvidia-visible-devices-as-volume-mounts=true --in-place
+  when: rt.stdout != 'nvidia'
+  notify: restart docker

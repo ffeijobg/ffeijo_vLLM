@@ -1,0 +1,14 @@
+# ansible/roles/tools/tasks/main.yml (the copied kind role already installs kind, kubectl, helm and k6)
+- name: Build nvkind in a throwaway Go container
+  ansible.builtin.shell: |
+    mkdir -p /opt/nvkind/bin
+    docker run --rm -e GOTOOLCHAIN=auto -v /opt/nvkind/bin:/go/bin golang:1.25 go install github.com/NVIDIA/nvkind/cmd/nvkind@latest
+    install -m 0755 /opt/nvkind/bin/nvkind /usr/local/bin/nvkind
+  args:
+    creates: /usr/local/bin/nvkind
+
+- name: Install jq (later checks use it)
+  ansible.builtin.apt:
+    name: jq
+    state: present
+

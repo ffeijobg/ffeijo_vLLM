@@ -1,0 +1,9 @@
+# ansible/playbooks/chaos/nfs-toggle.yml
+# usage: ... -e action=stop   (runs on the NAS)
+- hosts: nfs
+  become: true
+  tasks:
+    - name: "{{ action }} nfs-kernel-server"
+      ansible.builtin.systemd:
+        name: nfs-kernel-server
+        state: "{{ 'stopped' if action == 'stop' else 'started' }}"

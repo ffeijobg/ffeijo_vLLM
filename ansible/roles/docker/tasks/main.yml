@@ -1,0 +1,72 @@
+# ansible/roles/docker/tasks/main.yml
+# Docker is KinD's runtime. The daemon configuration here is tuned for:
+# - Multi-container KinD workloads (ulimits)
+# - Efficient image layer caching
+# - Log rotation to prevent disk exhaustion during load tests
+ 
+---
+- name: Install Docker dependencies
+  apt:
+    name:
+      - apt-transport-https
+      - ca-certificates
+      - curl
+      - gnupg
+      - lsb-release
+    state: present
+    update_cache: true
+ 
+- name: Create keyrings directory
+  file:
+    path: /etc/apt/keyrings
+    state: directory
+    mode: "0755"
+
+- name: Add Docker GPG key
+  get_url:
+    url: https://download.docker.com/linux/debian/gpg
+    dest: /etc/apt/keyrings/docker.asc
+    mode: "0644"
+    force: true
+
+- name: Add Docker repository
+  apt_repository:
+    repo: "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian {{ docker_apt_codename }} stable"
+    state: present
+ 
+- name: Install Docker CE
+  apt:
+    name:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+      - docker-buildx-plugin
+      - docker-compose-plugin
+    state: present
+    update_cache: true
+ 
+- name: Create Docker daemon config directory
+  file:
+    path: /etc/docker
+    state: directory
+    mode: "0755"
+ 
+- name: Configure Docker daemon
+  template:
+    src: daemon.json.j2
+    dest: /etc/docker/daemon.json
+    mode: "0644"
+  notify: restart docker
+ 
+- name: Start and enable Docker
+  systemd:
+    name: docker
+    state: started
+    enabled: true
+    daemon_reload: true
+ 
+- name: Add current user to docker group
+  user:
+    name: "{{ ansible_facts['user_id'] }}"
+    groups: docker
+    append: true
