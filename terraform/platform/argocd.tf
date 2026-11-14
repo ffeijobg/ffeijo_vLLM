@@ -21,11 +21,18 @@ resource "kubernetes_manifest" "vllm_app" {
       project = "default"
       source = { repoURL = var.gitops_repo, targetRevision = "main", path = "gitops/vllm" }
       destination = { server = "https://kubernetes.default.svc", namespace = "inference" }
+
+      # new: tolerate the selector the Rollouts controller writes onto the Service
+      ignoreDifferences = [
+        { group = "", kind = "Service", jsonPointers = ["/spec/selector"] }
+      ]
+
       syncPolicy = {
         automated   = { prune = true, selfHeal = true }
-        syncOptions = ["CreateNamespace=true"]
+        syncOptions = ["CreateNamespace=true", "RespectIgnoreDifferences=true"]   # new option added here
         retry       = { limit = 5, backoff = { duration = "5s", factor = 2, maxDuration = "3m" } }
       }
+
     }
   }
 }
