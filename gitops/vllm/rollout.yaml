@@ -22,6 +22,7 @@ spec:
     #   --gpu-memory-utilization=0.40   (two pods now share the GPU)
     metadata: { labels: { app: vllm } }
     spec:
+      enableServiceLinks: false      # stops Kubernetes injecting VLLM_PORT=tcp://... into the container
       runtimeClassName: nvidia
       nodeSelector: { workload: inference }
       tolerations:
