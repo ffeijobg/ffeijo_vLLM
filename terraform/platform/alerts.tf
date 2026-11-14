@@ -18,7 +18,7 @@ resource "kubernetes_manifest" "llm_slo_rules" {
             labels = { severity = "page" }
             annotations = { summary = "Burning the 28-day error budget 14x too fast (lab SLO 99.5%)" } },
           { alert  = "LLMProberStale"
-            expr   = "time() - llm_probe_last_success_timestamp_seconds > 120"
+            expr   = "(time() - llm_probe_last_success_timestamp_seconds > 120) or absent(llm_probe_last_success_timestamp_seconds)"
             for    = "1m"
             labels = { severity = "warn" }
             annotations = { summary = "No successful probe for 2 minutes" } }

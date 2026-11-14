@@ -21,7 +21,38 @@ spec:
     # Identical pod template to the Deployment in step 2.6, except:
     #   --gpu-memory-utilization=0.40   (two pods now share the GPU)
     metadata: { labels: { app: vllm } }
-    spec: {}   # replace with the spec from step 2.6
+    spec:
+      runtimeClassName: nvidia
+      nodeSelector: { workload: inference }
+      tolerations:
+        - { key: nvidia.com/gpu, operator: Exists, effect: NoSchedule }
+      containers:
+        - name: vllm
+          image: vllm/vllm-openai:<pinned-tag>      # pin a released tag, never latest
+          imagePullPolicy: IfNotPresent
+          args:
+            - --model=/models/qwen2.5-0.5b
+            - --served-model-name=lab-model
+            - --max-model-len=4096
+            - --gpu-memory-utilization=0.80
+            - --port=8000
+          ports: [{ containerPort: 8000, name: http }]
+          resources:
+            limits: { nvidia.com/gpu: 1, memory: 12Gi }
+            requests: { cpu: "2", memory: 8Gi }
+          volumeMounts:
+            - { name: models, mountPath: /models, readOnly: true }
+            - { name: shm, mountPath: /dev/shm }
+          startupProbe:
+            httpGet: { path: /health, port: http }
+            periodSeconds: 10
+            failureThreshold: 60                      # allows up to 10 minutes to load
+          readinessProbe:
+            httpGet: { path: /health, port: http }
+            periodSeconds: 10
+      volumes:
+        - { name: models, hostPath: { path: /models, type: Directory } }   # the node's bind mount of the host export
+        - { name: shm, emptyDir: { medium: Memory, sizeLimit: 2Gi } }
 ---
 apiVersion: v1
 kind: Service
