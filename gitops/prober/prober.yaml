@@ -11,7 +11,7 @@ spec:
       nodeSelector: { workload: apps }              # a CPU worker: the image was loaded only into those nodes (Step 3.3)
       containers:
         - name: prober
-          image: llm-prober:0.1.0                   # the local image from Step 3.3; use your registry path if you pushed it
+          image: llm-prober:0.1.1                   # the local image from Step 3.3; use your registry path if you pushed it
           imagePullPolicy: IfNotPresent
           args: ["--serve", "9105", "--interval", "15"]
           env:

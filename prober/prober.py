@@ -8,6 +8,8 @@ MODEL = os.getenv("MODEL", "lab-model")
 LATENCY_BUDGET_S = float(os.getenv("LATENCY_BUDGET_S", "5"))
 
 REQS = Counter("llm_probe_requests_total", "Probe attempts", ["result"])
+REQS.labels("ok")      # creates the series at 0
+REQS.labels("error")   # so the ratio has data before the first failure
 DURATION = Histogram("llm_probe_duration_seconds", "Total request time",
                      buckets=(0.25, 0.5, 1, 2, 4, 8, 16))
 TTFT = Gauge("llm_probe_ttft_seconds", "Time to first generated token")
