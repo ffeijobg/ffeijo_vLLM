@@ -35,7 +35,7 @@ spec:
             - --model=/models/qwen2.5-0.5b
             - --served-model-name=lab-model
             - --gpu-memory-utilization=0.40
-            - --max-model-len=1000000
+            - --max-model-len=2048
             - --max-num-seqs=16
             - --port=8000
           ports: [{ containerPort: 8000, name: http }]
