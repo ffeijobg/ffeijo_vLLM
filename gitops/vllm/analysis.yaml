@@ -1,0 +1,24 @@
+# gitops/vllm/analysis.yaml
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata: { name: llm-prober-gate, namespace: inference }
+spec:
+  args: [{ name: endpoint }]
+  metrics:
+    - name: probe
+      count: 3
+      interval: 30s
+      failureLimit: 0                 # one failed probe fails the whole gate
+      provider:
+        job:
+          spec:
+            backoffLimit: 0
+            template:
+              spec:
+                restartPolicy: Never
+                containers:
+                  - name: prober
+                    image: <your-registry>/llm-prober:0.1.0
+                    args: ["--retries", "1"]
+                    env:
+                      - { name: ENDPOINT, value: "{{args.endpoint}}" }

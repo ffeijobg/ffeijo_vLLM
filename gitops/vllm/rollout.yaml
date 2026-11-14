@@ -1,0 +1,31 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata: { name: vllm, namespace: inference }
+spec:
+  replicas: 1
+  revisionHistoryLimit: 3
+  progressDeadlineSeconds: 300
+  progressDeadlineAbort: true       # abort a stuck update; if your version rejects this, abort by hand
+  selector: { matchLabels: { app: vllm } }
+  strategy:
+    blueGreen:
+      activeService: vllm
+      previewService: vllm-preview
+      autoPromotionEnabled: true     # promote automatically, but only after the gate passes
+      scaleDownDelaySeconds: 60
+      prePromotionAnalysis:
+        templates: [{ templateName: llm-prober-gate }]
+        args:
+          - { name: endpoint, value: "http://vllm-preview.inference.svc:8000" }
+  template:
+    # Identical pod template to the Deployment in step 2.6, except:
+    #   --gpu-memory-utilization=0.40   (two pods now share the GPU)
+    metadata: { labels: { app: vllm } }
+    spec: {}   # replace with the spec from step 2.6
+---
+apiVersion: v1
+kind: Service
+metadata: { name: vllm-preview, namespace: inference, labels: { app: vllm-preview } }
+spec:
+  selector: { app: vllm }
+  ports: [{ name: http, port: 8000, targetPort: http }]
