@@ -18,7 +18,7 @@ spec:
                 restartPolicy: Never
                 containers:
                   - name: prober
-                    image: <your-registry>/llm-prober:0.1.0
+                    image: llm-prober:0.1.1
                     args: ["--retries", "1"]
                     env:
                       - { name: ENDPOINT, value: "{{args.endpoint}}" }
