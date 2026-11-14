@@ -24,6 +24,7 @@ resource "kubernetes_manifest" "vllm_app" {
       syncPolicy = {
         automated   = { prune = true, selfHeal = true }
         syncOptions = ["CreateNamespace=true"]
+        retry       = { limit = 5, backoff = { duration = "5s", factor = 2, maxDuration = "3m" } }
       }
     }
   }
