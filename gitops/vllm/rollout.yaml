@@ -33,7 +33,7 @@ spec:
           imagePullPolicy: IfNotPresent
           args:
             - --model=/models/qwen2.5-0.5b
-            - --served-model-name=lab-model
+            - --served-model-name=lab-model-v2
             - --gpu-memory-utilization=0.40
             - --max-model-len=2048
             - --max-num-seqs=16
