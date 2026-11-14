@@ -2,3 +2,6 @@
 .terraform/
 *.retry
 .generated/
+.venv/
+.venv/
+.venv/
