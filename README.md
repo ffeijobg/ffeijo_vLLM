@@ -66,7 +66,7 @@ Run end to end on the reference machine, with the checks and outputs recorded in
 - A prober that sends real completions and exports `llm_probe_*` metrics, scraped alongside vLLM's own `/metrics`.
 - Five SLIs checked against real metric names, a burn-rate alert with a stale-prober guard, and a Grafana dashboard stored as a ConfigMap.
 
-Not included yet: a gated rollout with Argo Rollouts, inference failure drills, and the closing interview material. They are outlined in `Plan.md` and left out until they have been run.
+Not included yet: the load test, the remaining failure drills, and the closing interview material. The gated rollout and the alert proofs are done (see `docs/`). They are outlined in `Plan.md` and left out until they have been run.
 
 ## Design decisions worth knowing
 
@@ -94,5 +94,6 @@ Not included yet: a gated rollout with Argo Rollouts, inference failure drills, 
 
 - Alert behavior tested by breaking the thing each alert watches. Detection times and the `absent()` fix are in `docs/slo.md` and `docs/numbers.md`.
 - Incidents hit while building the lab, with causes and fixes: `docs/incidents.md`.
-- GPU time-slicing enabled (two scheduling slots, one physical GPU, shared memory). On a 4 GB card a second vLLM replica does not fit, so rollout practice with Argo Rollouts uses a small CPU stub rather than the real model.
+- GPU time-slicing enabled (two scheduling slots, one physical GPU, shared memory). At 0.80 GPU memory utilization a second vLLM replica does not fit on a 4 GB card; at 0.40 per pod two fit, which is what the blue-green rollout uses.
 - ArgoCD Applications have a retry policy, and self-heal was verified by deleting a managed object.
+- Blue-green rollout with a real-request gate (Argo Rollouts) is implemented and tested on the real vLLM: a good release promotes, a wrong model name is stopped by the gate, and an oversized context never becomes Ready. Results are in `docs/numbers.md`.

@@ -53,3 +53,37 @@ Times are local (CST, UTC-6) unless marked UTC.
 - **Also found:** a compiled `__pycache__` file was tracked, and my commits carried a placeholder author identity.
 - **Fix:** set the git identity, amend the unpushed commit, stash the work in progress, untrack the cache file, `git pull --rebase && git push`.
 - **Prevention:** commit finished work promptly, keep generated files in `.gitignore`, and chain `pull --rebase && push`.
+
+## 7. Green pod could not start next to blue at 0.80
+
+- **Symptom:** the new pod exited at startup: `Free memory on device cuda:0 (0.71/3.68 GiB) on startup is less than desired GPU memory utilization (0.8, 2.94 GiB)`.
+- **Cause:** vLLM reserves its whole budget up front and refuses to start unless that much is free. Blue held about 2.9 GiB, so green saw 0.71 GiB.
+- **Impact:** none for users. Blue kept serving and the Rollout stayed on the old revision.
+- **Fix:** both versions use `--gpu-memory-utilization 0.40` (with `--max-model-len` reduced and `--max-num-seqs 16`). One pod then uses about 1.3 GiB and both together peaked at 2678 MiB of 4094 MiB.
+- **Cost of the fix:** the running Rollout had to be deleted and recreated (about 2 minutes of planned outage), because blue could not be shrunk in place while green was starting.
+
+## 8. Wrong model name stopped by the gate
+
+- **Symptom:** green pod Ready, but the pre-promotion probe got `404` from `vllm-preview`.
+- **Why `/health` missed it:** `/health` proves the engine is up, not that the right model name is served.
+- **Result:** the first probe failed (`failureLimit: 0`), the Rollout aborted, and blue served throughout. Commit to abort was 4 m 38 s (3 m 35 s of that was the Git poll); ReplicaSet creation to abort was 63 s.
+- **Recovery:** `git revert`. The Rollout reused the stable ReplicaSet and created no new pod.
+
+## 9. Oversized context never became Ready
+
+- **Symptom:** green crash-looped within seconds, 3 restarts in 102 s.
+- **Cause:** `ValidationError: max_model_len (1000000) is greater than the derived max_model_len (max_position_embeddings=32768)`. It fails config validation before any GPU memory is allocated. vLLM offers `VLLM_ALLOW_LONG_MAX_MODEL_LEN` to override it, with a warning about NaN or out-of-bounds errors.
+- **Result:** no AnalysisRun was created (the analysis starts only after Ready), blue stayed `1/1`, and I reverted before the 300 s progress deadline, so the deadline abort was not exercised.
+
+## 10. Port-forward bound to a dead pod
+
+- **Symptom:** `lost connection to pod ... failed to find sandbox`, and `curl localhost:8000` returned nothing even though blue was healthy.
+- **Cause:** `kubectl port-forward svc/vllm` resolves one pod when it starts. When that pod is replaced, the forward dies.
+- **Prevention:** judge availability from the prober's Prometheus series instead of a forward, and restart the forward after any rollout.
+
+## 11. Probe errors during the rollout tests: explained
+
+- **Measured:** 8 failed probes over 45 minutes and one burn-rate alert firing (20:12:57 to 20:19:27 UTC).
+- **Cause:** all eight errors fell between 20:10:57 and 20:15:27, which is the planned delete and recreate of the Rollout for the memory-budget change. There were zero errors during the three release tests.
+- **Mistake I made:** I first assumed the measurement window started after the planned outage. Checking when the errors happened, instead of trusting a total, showed they belonged to the planned outage.
+- **Not verified:** why blue restarted twice during that recreate (the old pod's logs were gone). Likely GPU memory still being released by the terminating pod.

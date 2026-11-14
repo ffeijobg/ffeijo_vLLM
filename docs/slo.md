@@ -34,7 +34,7 @@ Load-test knee (concurrent users where p95 first breaks the target): TODO.
 Notes:
 
 - Firing times are pending time plus the rule's `for` window (calculated).
-- The burn-rate alert needs both windows above the threshold, so it should clear about 5 minutes after probes recover: measured clear time TODO.
+- The burn-rate alert needs both windows above the threshold, so it clears a few minutes after probes recover: measured 4 m 40 s after the pod was 1/1. The stale alert cleared within about 10 s.
 - The stale rule needs the `absent()` branch. Without it, a missing prober produces no result and nothing fires. With the prober gone, the burn-rate alert stays silent (no data), which is why the stale alert exists.
 - Recovery: after scale-up the vLLM pod reached 1/1 in 70 s.
 
@@ -47,7 +47,7 @@ Notes:
 ## 6. Known limits
 
 - One replica: a restart is an outage of about 70 s. A gate can detect a bad release but cannot shield users from it.
-- One vLLM pod uses about 2.9 GiB of 4 GiB, so a second replica does not fit at `--gpu-memory-utilization 0.80`.
+- At `--gpu-memory-utilization 0.80` one pod uses about 2.9 GiB and a second does not fit. At 0.40 a pod uses about 1.3 GiB and two fit together (peak 2678 MiB of 4094 MiB), which blue-green needs.
 - Time-slicing gives two scheduling slots on one GPU but shares memory without isolation.
 - A PostSync gate can stall auto-heal when a release is unhealthy. A retry policy and manual termination are the remedies.
 - Probe availability only covers what the prober's prompt exercises.
