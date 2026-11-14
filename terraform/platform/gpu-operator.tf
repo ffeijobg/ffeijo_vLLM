@@ -41,5 +41,26 @@ resource "helm_release" "gpu_operator" {
     toolkit      = { enabled = false }   # Ansible and nvkind own the runtime
     operator     = { runtimeClass = "nvidia" }
     dcgmExporter = { serviceMonitor = { enabled = true } }
+    devicePlugin = { config = { name = "time-slicing-config", default = "any" } }
   })]
+}
+
+###
+resource "kubernetes_config_map" "time_slicing" {
+  metadata {
+    name      = "time-slicing-config"
+    namespace = "gpu-operator"
+  }
+  data = {
+    any = <<-EOT
+      version: v1
+      flags:
+        migStrategy: none
+      sharing:
+        timeSlicing:
+          resources:
+            - name: nvidia.com/gpu
+              replicas: 2
+    EOT
+  }
 }
