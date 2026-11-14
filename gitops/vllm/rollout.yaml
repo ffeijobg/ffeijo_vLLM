@@ -20,7 +20,7 @@ spec:
   template:
     # Identical pod template to the Deployment in step 2.6, except:
     #   --gpu-memory-utilization=0.40   (two pods now share the GPU)
-    metadata: { labels: { app: vllm } }
+    metadata: { labels: { app: vllm , release: "2" } }
     spec:
       enableServiceLinks: false      # stops Kubernetes injecting VLLM_PORT=tcp://... into the container
       runtimeClassName: nvidia
