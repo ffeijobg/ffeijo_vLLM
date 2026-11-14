@@ -89,3 +89,10 @@ Not included yet: a gated rollout with Argo Rollouts, inference failure drills, 
 - One Debian 12 server, 8 CPUs, 31 GiB RAM, one NVIDIA RTX A400 (4 GB), driver 580.126.18, Docker from the distribution, kind 0.33.0 (Kubernetes 1.34).
 - kind runs every node as a container on one host: one kernel, one disk, one GPU. That is enough to learn and test the platform, but it does not model real node failure, network partitions or in-place upgrades.
 - This is a lab, not a production design: no authentication in front of vLLM, no high availability, local Terraform state.
+
+## Update 2026-11-14
+
+- Alert behavior tested by breaking the thing each alert watches. Detection times and the `absent()` fix are in `docs/slo.md` and `docs/numbers.md`.
+- Incidents hit while building the lab, with causes and fixes: `docs/incidents.md`.
+- GPU time-slicing enabled (two scheduling slots, one physical GPU, shared memory). On a 4 GB card a second vLLM replica does not fit, so rollout practice with Argo Rollouts uses a small CPU stub rather than the real model.
+- ArgoCD Applications have a retry policy, and self-heal was verified by deleting a managed object.
