@@ -87,3 +87,29 @@ Times are local (CST, UTC-6) unless marked UTC.
 - **Cause:** all eight errors fell between 20:10:57 and 20:15:27, which is the planned delete and recreate of the Rollout for the memory-budget change. There were zero errors during the three release tests.
 - **Mistake I made:** I first assumed the measurement window started after the planned outage. Checking when the errors happened, instead of trusting a total, showed they belonged to the planned outage.
 - **Not verified:** why blue restarted twice during that recreate (the old pod's logs were gone). Likely GPU memory still being released by the terminating pod.
+
+## 12. Pod refused after a host reboot (UnexpectedAdmissionError)
+
+- **Symptom:** after the host restarted, the old vLLM pod showed `UnexpectedAdmissionError`; a replacement pod came up normally.
+- **Cause (likely):** the kubelet re-admitted the pod before the NVIDIA device plugin had registered the GPU, so the GPU request could not be satisfied. Not verified from logs.
+- **Fix:** the ReplicaSet created a replacement once the plugin was ready; I deleted the stale pod. Recovery to Ready was 3 m 33 s after boot.
+
+## 13. Storage outage hid inside ContainerCreating
+
+- **Symptom:** after a pod restart with the NFS server stopped, the endpoint was down for about 5 minutes and the pod sat in `ContainerCreating` with 0 restarts and no FailedMount event.
+- **Evidence:** the kubelet log on the node showed `unmounted volumes=[models] ... context deadline exceeded` 2 m 03 s after volume setup began, then the pod started after NFS returned.
+- **Lesson:** a hung dependency is quiet. A "pod pending too long" alert would catch it; restart counts and crash-loop alerts would not.
+- **Prevention:** keep model weights on node-local disk or copy them at pod start, and keep a spare replica.
+
+## 12. Pod refused after a host reboot (UnexpectedAdmissionError)
+
+- **Symptom:** after the host restarted, the old vLLM pod showed `UnexpectedAdmissionError`; a replacement pod came up normally.
+- **Cause (likely):** the kubelet re-admitted the pod before the NVIDIA device plugin had registered the GPU, so the GPU request could not be satisfied. Not verified from logs.
+- **Fix:** the ReplicaSet created a replacement once the plugin was ready; I deleted the stale pod. Recovery to Ready was 3 m 33 s after boot.
+
+## 13. Storage outage hid inside ContainerCreating
+
+- **Symptom:** after a pod restart with the NFS server stopped, the endpoint was down for about 5 minutes and the pod sat in `ContainerCreating` with 0 restarts and no FailedMount event.
+- **Evidence:** the kubelet log on the node showed `unmounted volumes=[models] ... context deadline exceeded` 2 m 03 s after volume setup began, then the pod started after NFS returned.
+- **Lesson:** a hung dependency is quiet. A "pod pending too long" alert would catch it; restart counts and crash-loop alerts would not.
+- **Prevention:** keep model weights on node-local disk or copy them at pod start, and keep a spare replica.

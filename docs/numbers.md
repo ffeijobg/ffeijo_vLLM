@@ -1,7 +1,7 @@
 # Lab numbers
 
 Lab values: one 4 GB NVIDIA RTX A400, one vLLM replica, kind on one host.
-Measured 2026-11-14. Times are UTC unless a row says otherwise.
+Measured 2026-11-14 and 2026-11-15. Times are UTC unless a row says otherwise.
 The host clock is not NTP-synced (see Open items), so use durations, not absolute times, when comparing runs.
 
 ## Service baseline (idle)
@@ -9,7 +9,7 @@ The host clock is not NTP-synced (see Open items), so use durations, not absolut
 | Item | Value |
 | --- | --- |
 | vLLM version and model | v0.33.0, Qwen2.5-0.5B served as `lab-model` |
-| Settings at first baseline | `--max-model-len 4096`, `--gpu-memory-utilization 0.80`; later changed to 0.40 (with `--max-num-seqs 16`) so two pods fit, see the rollout section |
+| Settings at first baseline | `--max-model-len 4096`, `--gpu-memory-utilization 0.80`; later changed to 0.40 with `--max-model-len 2048` and `--max-num-seqs 16` so two pods fit, see the rollout section |
 | Cold start (pod Running to 1/1) | 70 s (image already on the node, weights on a host mount) |
 | Probe mean latency | about 115 to 125 ms |
 | p95 time to first token | 0.058 s |
@@ -91,3 +91,63 @@ At 0.80 the green pod could not start: "Free memory on device (0.71/3.68 GiB) is
 | 20:10 to 20:19 | Planned recreate for the memory budget | did not fire | 20:12:57 to 20:19:27 |
 
 Query range starts cut off the first window; the earlier start times for experiment A are in the detection table above.
+
+## Canary on a CPU stub (Argo Rollouts, 5 replicas, steps 20% > analysis > 50% > 30 s pause > 100%)
+
+Times UTC; commit times converted from CST. Pod-count weighting: with 5 replicas the smallest step is 20%.
+
+| Release | Commit | ReplicaSet created | Analysis created | Result |
+| --- | --- | --- | --- | --- |
+| Good (release label 2) | 04:24:45 | 04:27:31 (+2 m 46 s, Git poll) | 04:27:32 | Successful, 3 of 3 probes, promoted to 100% |
+| Bad (wrong model name) | 04:30:54 | 04:33:36 (+2 m 42 s, Git poll) | 04:33:37 | Failed on the first probe (failureLimit 0), aborted |
+| Retry of the bad revision | n/a | n/a | 04:36:53 | Failed again: retry cannot fix a bad spec |
+| Revert | 04:40:14 | n/a | n/a | Rollout back to Healthy, five stable pods |
+
+- The analysis starts about 1 s after the canary ReplicaSet is created, because the stub is Ready almost instantly (the real vLLM needs about 61 s to load).
+- Failed analyses stop at the first failing probe, so no run shows probe 2 or 3.
+- Both Services select the stable pod-template hash when no rollout is running (verified: `cd754d6f7` for 2 minutes).
+- Verbs used and their order: TODO (from shell history).
+
+## Host reboot recovery (2026-11-15, unplanned)
+
+| Event | Time (UTC) | After boot |
+| --- | --- | --- |
+| Host boot | 16:23:24 | 0 |
+| vLLM pod started | 16:25:37 | 2 m 13 s |
+| vLLM pod Ready | 16:26:57 | 3 m 33 s |
+
+- vLLM pod start to Ready: 80 s (weights probably read cold after the reboot; not verified).
+- One pod from before the reboot ended in `UnexpectedAdmissionError`: the kubelet re-admitted it before the NVIDIA device plugin had registered the GPU. The ReplicaSet created a replacement that came up normally; the stale pod was deleted by hand.
+- After recovery: all three ArgoCD apps Synced and Healthy, both Rollouts Healthy, no LLM alert firing, 20 of 20 probes ok over the next 5 minutes.
+
+## Drill: kill the vLLM pod (poller every 2 s, in-cluster `curl -m 2`)
+
+| Event | Time (UTC) | After last good response |
+| --- | --- | --- |
+| Last 200 | 16:50:40 | 0 |
+| First 000 | 16:50:42 | +2 s |
+| Last 000 | 16:51:42 | +62 s |
+| First 200 again | 16:51:44 | +64 s |
+
+- User-visible outage: 62 to 64 s (poll granularity 2 s). `kubectl delete` plus Ready watch measured about 70 s.
+- Failure mode: connection refused or timeout (`000`), not an HTTP error, because the Service had no ready endpoints.
+- No alert fired: the 1-hour error ratio stayed under the 7.2% fast-burn threshold, and `LLMProberStale` needs more than 120 s without a good probe.
+- Cold start for comparison: about 70 s earlier in the day, 3 m 33 s after the host reboot.
+
+[200~cat >> docs/numbers.md <<'EOF'
+
+## Drill: NFS stopped, then the vLLM pod deleted (poller every 2 s)
+
+| Event | Time (UTC) | After pod delete |
+| --- | --- | --- |
+| Last 200 | 17:03:20 | -1 s |
+| First 000 | 17:03:22 | +1 s |
+| Last 000 | 17:08:24 | 5 m 03 s |
+| First 200 again | 17:08:26 | 5 m 05 s |
+
+- User-visible outage: about 5 m 06 s, against 64 s when storage is healthy (drill: kill the pod).
+- Pod stayed in `ContainerCreating` for 4 m 05 s with 0 restarts: no crash loop, no error, just a blocked mount. After NFS returned it loaded the weights in 58 s (Running 0/1 to 1/1).
+- The host's hard NFS mount hung instead of failing: Ansible fact gathering timed out reading mount info for `/srv/models`.
+- Cause of the block (kubelet log): volume setup for `models` stalled; 2 m 03 s after it started (17:03:21), the kubelet logged `unmounted volumes=[models] ... context deadline exceeded` (17:05:24). The hostPath type check on the hung NFS mount is the likely mechanism; the log does not name the call.
+- Not tested in this run: whether a running pod keeps serving when NFS stops (the weights are in GPU memory, so it should).
+- Detection gap: the kubelet logged the volume timeout, but no `FailedMount` event appeared on the pod, so `kubectl describe pod` showed nothing wrong. The evidence was only in the node's kubelet log.
