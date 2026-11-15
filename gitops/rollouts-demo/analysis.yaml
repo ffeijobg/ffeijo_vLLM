@@ -1,0 +1,24 @@
+# analysis.yaml
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata: { name: stub-gate, namespace: rollouts-demo }
+spec:
+  args: [{ name: endpoint }]
+  metrics:
+    - name: probe
+      count: 3
+      interval: 20s
+      failureLimit: 0
+      provider:
+        job:
+          spec:
+            backoffLimit: 0
+            template:
+              spec:
+                restartPolicy: Never
+                containers:
+                  - name: prober
+                    image: llm-prober:0.1.1
+                    args: ["--retries", "1"]
+                    env:
+                      - { name: ENDPOINT, value: "{{args.endpoint}}" }# analysis.yaml

@@ -1,0 +1,43 @@
+# rollout.yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata: { name: stub, namespace: rollouts-demo }
+spec:
+  replicas: 5
+  selector: { matchLabels: { app: stub } }
+  strategy:
+    canary:
+      stableService: stub
+      canaryService: stub-canary
+      steps:
+        - setWeight: 20
+        - analysis:
+            templates: [{ templateName: stub-gate }]
+            args: [{ name: endpoint, value: "http://stub-canary.rollouts-demo.svc:8000" }]
+        - setWeight: 50
+        - pause: { duration: 30s }
+        - setWeight: 100
+  template:
+    metadata: { labels: { app: stub } }
+    spec:
+      containers:
+        - name: stub
+          image: llm-stub:0.1.0
+          imagePullPolicy: IfNotPresent
+          env: [{ name: SERVED_MODEL, value: lab-model }]
+          ports: [{ containerPort: 8000, name: http }]
+          readinessProbe: { httpGet: { path: /, port: http } }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: stub, namespace: rollouts-demo }
+spec:
+  selector: { app: stub }
+  ports: [{ name: http, port: 8000, targetPort: http }]
+---
+apiVersion: v1
+kind: Service
+metadata: { name: stub-canary, namespace: rollouts-demo }
+spec:
+  selector: { app: stub }
+  ports: [{ name: http, port: 8000, targetPort: http }]
