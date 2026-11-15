@@ -24,7 +24,7 @@ spec:
         - name: stub
           image: llm-stub:0.1.0
           imagePullPolicy: IfNotPresent
-          env: [{ name: SERVED_MODEL, value: lab-model }]
+          env: [{ name: SERVED_MODEL, value: lab-model-v2 }]
           ports: [{ containerPort: 8000, name: http }]
           readinessProbe: { httpGet: { path: /, port: http } }
 ---
