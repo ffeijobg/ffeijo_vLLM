@@ -151,3 +151,23 @@ Times UTC; commit times converted from CST. Pod-count weighting: with 5 replicas
 - Cause of the block (kubelet log): volume setup for `models` stalled; 2 m 03 s after it started (17:03:21), the kubelet logged `unmounted volumes=[models] ... context deadline exceeded` (17:05:24). The hostPath type check on the hung NFS mount is the likely mechanism; the log does not name the call.
 - Not tested in this run: whether a running pod keeps serving when NFS stops (the weights are in GPU memory, so it should).
 - Detection gap: the kubelet logged the volume timeout, but no `FailedMount` event appeared on the pod, so `kubectl describe pod` showed nothing wrong. The evidence was only in the node's kubelet log.
+## Drill: kubelet stopped on the GPU node (single GPU node)
+
+| Event | Time (UTC) | Source |
+| --- | --- | --- |
+| Last kubelet heartbeat (kubelet stopped about here; the stop command was not timestamped) | 17:25:05 | node condition `LastHeartbeatTime` |
+| Node Unknown, pod Ready=False, endpoint ready=false | 17:25:58 | node and pod conditions, `NodeNotReady` event |
+| First 000 | 17:26:01 | poller |
+| Restore command run | 17:28:32 | `date -u` |
+| Node Ready=True | 17:28:34 | node condition |
+| Brief 200, then 000 again | 17:28:38, 17:28:42 | poller |
+| Pod Ready=True, stable 200 | 17:28:44 | pod condition, poller |
+
+- Detection: the control plane marked the node Unknown and removed the pod from the Service 53 s after the last heartbeat.
+- User-visible outage: 2 m 43 s (first 000 at 17:26:01 to stable 200 at 17:28:44). The pod's Ready condition was false for 2 m 46 s.
+- Recovery after the restore command: 12 s to stable service, with no model reload, because the pod was never evicted or stopped.
+- The container kept running the whole time. `kubectl get pods` showed `1/1 Running` throughout, because that column counts ready containers; the pod's Ready condition (which feeds endpoints) was False.
+- `kubectl logs` failed with `connection refused` on the kubelet port: logs and exec depend on the kubelet.
+- 9.47 probe errors in the 5 minutes before the restore.
+- Eviction not reached: the node had the `unreachable:NoExecute` taint, the default toleration is 300 s, and I restored after 2 m 34 s. With one GPU node there is nowhere to reschedule.
+- False recovery after the restore: a 200 at 17:28:38 and a 000 at 17:28:42 before the stable 200. Likely the restarted kubelet reset probe state and readiness dropped again until the probes passed (not verified; no probe-failure events were recorded).
