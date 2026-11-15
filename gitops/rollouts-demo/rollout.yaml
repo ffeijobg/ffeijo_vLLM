@@ -18,7 +18,7 @@ spec:
         - pause: { duration: 30s }
         - setWeight: 100
   template:
-    metadata: { labels: { app: stub } }
+    metadata: { labels: { app: stub , release: "2" } }
     spec:
       containers:
         - name: stub
