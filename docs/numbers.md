@@ -184,12 +184,15 @@ Times UTC; commit times converted from CST. Pod-count weighting: with 5 replicas
 | --- | --- | --- | --- | --- | --- | --- |
 | 1 | 1 > 2 > 8 > 16 over 6 min | 2,542 | 0 | 0.925 s | 0.85 s / 0.96 s | 7.0 req/s |
 | 2 | 16 > 32 > 48 > 64 over 8 min | 8,126 | 0 | 3.14 s | 1.80 s / 3.5 s | 16.9 req/s |
+| 3 | same stages as run 2, with empty-body logging | 8,112 | 0 | 3.12 s | 1.83 s / 3.54 s | 16.9 req/s |
 
 - Run 1 did not saturate: `waiting` was 0 in every 10 s sample, `running` peaked at 10.
 - Run 2: `running` hit the 16 cap and `waiting` first rose above 0 at about 21 VUs (start time inferred, plus or minus 2 VUs). Waiting grew about linearly to 46 at about 62 VUs and drained within 30 s of ramp-down.
 - Saturation was compute and batch cap, not memory: KV cache peaked near 8%, GPU utilization about 100%, GPU memory flat.
 - Queueing appeared as time-to-first-token (p95 plateau about 2.4 s on the dashboard against a 1 s target), not inter-token latency, which stayed flat.
 - Probe availability stayed 100% throughout: probes count as ok within a 5 s budget, and the slowest request was 3.5 s. Latency broke the target while availability did not.
-- 3 of 8,126 completions had empty text (HTTP 200); cause not verified.
+- Empty completions: 3 of 8,126 (run 2) and 2 of 8,112 (run 3). The logged body shows HTTP 200, empty content and finish_reason "stop": the model emitted its end-of-sequence token first. A model behavior, not a server error.
 - k6 exited 99: the 2 s p95 threshold crossed by design.
 - p95 first above 2 s at about TODO VUs (from the knee script). Tokens per second: TODO.
+- Run 3 reproduced run 2 within about 1% (p95 3.12 s against 3.14 s, 16.87 against 16.91 req/s). Queueing again started at about 20 to 21 concurrent users (first `waiting` sample above 0 at about 1 m 40 s); the queue peaked at 43 waiting near 61 users.
+- A queueing estimate (derived, not measured) explains the p95: about 43 waiting at about 19 requests per second is about 2.3 s of waiting, plus about 0.85 s of service, which matches 3.1 s. Time-to-first-token carries the delay; inter-token latency stays flat.
