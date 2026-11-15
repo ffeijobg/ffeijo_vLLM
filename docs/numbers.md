@@ -56,7 +56,7 @@ Before the fix, the stale rule did not fire at all when the prober was gone: a m
 - [x] Burn-rate alert clear time: 4 m 40 s after the pod was 1/1 (experiment A)
 - [x] Stale alert clear time: within about 10 s of the pod being 1/1 (first successful probe)
 - [x] Blue-green gate timings: recorded in the rollout section above (the PostSync hook bad-release test was not run separately)
-- [ ] Load-test knee: concurrent users and tokens per second
+- [x] Load-test knee: queueing from about 20 users (details in the load test section; tokens per second TODO)
 - [ ] Warm restart to Ready (NFS cache warm)
 
 ## Open items
@@ -171,3 +171,25 @@ Times UTC; commit times converted from CST. Pod-count weighting: with 5 replicas
 - 9.47 probe errors in the 5 minutes before the restore.
 - Eviction not reached: the node had the `unreachable:NoExecute` taint, the default toleration is 300 s, and I restored after 2 m 34 s. With one GPU node there is nowhere to reschedule.
 - False recovery after the restore: a 200 at 17:28:38 and a 000 at 17:28:42 before the stable 200. Likely the restarted kubelet reset probe state and readiness dropped again until the probes passed (not verified; no probe-failure events were recorded).
+
+## Load test, run 1 (k6, 1 > 2 > 8 > 16 VUs over 6 minutes, 64-token chat completions, through a port-forward)
+
+- 2,542 requests, 0 failed. Request time: median 853 ms, p90 916 ms, p95 925 ms, max 956 ms (min 48.6 ms: some completions ended early).
+- vLLM `waiting` was 0 in every 10 s sample; `running` peaked at 10 in the samples (limit `--max-num-seqs 16`).
+- The server was not saturated at 16 VUs, so run 1 did not find the knee. Peak prometheus values: TODO (paste from the queries).
+
+## Load test (k6, 64-token chat completions through a port-forward, `--max-num-seqs 16`)
+
+| Run | Stages (VUs) | Requests | Failed | Request time p95 | Median / max | Avg throughput |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | 1 > 2 > 8 > 16 over 6 min | 2,542 | 0 | 0.925 s | 0.85 s / 0.96 s | 7.0 req/s |
+| 2 | 16 > 32 > 48 > 64 over 8 min | 8,126 | 0 | 3.14 s | 1.80 s / 3.5 s | 16.9 req/s |
+
+- Run 1 did not saturate: `waiting` was 0 in every 10 s sample, `running` peaked at 10.
+- Run 2: `running` hit the 16 cap and `waiting` first rose above 0 at about 21 VUs (start time inferred, plus or minus 2 VUs). Waiting grew about linearly to 46 at about 62 VUs and drained within 30 s of ramp-down.
+- Saturation was compute and batch cap, not memory: KV cache peaked near 8%, GPU utilization about 100%, GPU memory flat.
+- Queueing appeared as time-to-first-token (p95 plateau about 2.4 s on the dashboard against a 1 s target), not inter-token latency, which stayed flat.
+- Probe availability stayed 100% throughout: probes count as ok within a 5 s budget, and the slowest request was 3.5 s. Latency broke the target while availability did not.
+- 3 of 8,126 completions had empty text (HTTP 200); cause not verified.
+- k6 exited 99: the 2 s p95 threshold crossed by design.
+- p95 first above 2 s at about TODO VUs (from the knee script). Tokens per second: TODO.
