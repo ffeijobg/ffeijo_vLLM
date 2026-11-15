@@ -100,3 +100,11 @@ Times are local (CST, UTC-6) unless marked UTC.
 - **Evidence:** the node's kubelet log showed `unmounted volumes=[models] ... context deadline exceeded` 2 m 03 s after volume setup began.
 - **Lesson:** a hung dependency is quiet. A "pod pending too long" alert would catch it; restart-count alerts would not.
 - **Prevention:** keep model weights on node-local disk or copy them at pod start, and keep a spare replica.
+
+## Evidence commands for the interview stories (verified 2026-11-15)
+
+- **VLLM_PORT:** a throwaway pod in `inference` gets 16 `VLLM_*` variables from the `vllm` and `vllm-preview` Services, including `VLLM_PORT=tcp://10.96.120.194:8000`. With `enableServiceLinks: false` it gets none (check the empty output; the exit code is the last command in the pipe, so it proves nothing). The Rollout template sets `enableServiceLinks: false`.
+  - History (`git log -S enableServiceLinks -- gitops/vllm`): `f79221a` original fix, `991a034` lost in the move to blue-green, `d37f046` restored.
+  - Whether vLLM parses `VLLM_PORT` as its own setting is inferred from the crash log, not shown directly.
+- **NVML / cgroups:** the host `/etc/nvidia-container-runtime/config.toml` has `#no-cgroups = false` (commented, default false). Docker uses the systemd cgroup driver on cgroup v2. `nvidia-smi -L` works inside `gpu-lab-worker`. Where `no-cgroups=true` was set, and the exact error text, are in my own notes (not re-verified here).
+- **GPU Operator operands:** every kind node shows `feature.node.kubernetes.io/pci-10de.present=true`, because the nodes are containers on one host. Terraform (`kubernetes_labels.cpu_workers_no_gpu_operands`) sets `nvidia.com/gpu.deploy.operands=false` on the two CPU workers, so operand pods run only on `gpu-lab-worker`. The control plane keeps the default deploy labels (true) but runs no operand pods; its taint is the likely reason (not verified).

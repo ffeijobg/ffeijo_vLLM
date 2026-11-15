@@ -57,7 +57,7 @@ Before the fix, the stale rule did not fire at all when the prober was gone: a m
 - [x] Stale alert clear time: within about 10 s of the pod being 1/1 (first successful probe)
 - [x] Blue-green gate timings: recorded in the rollout section above (the PostSync hook bad-release test was not run separately)
 - [x] Load-test knee: queueing from about 20 users (details in the load test section; about 1,080 tokens per second at saturation)
-- [ ] Warm restart to Ready (NFS cache warm)
+- [x] Warm restart to Ready: 64 s from the pod-kill drill (about 70 s pod start to Ready)
 
 ## Open items
 
@@ -106,7 +106,7 @@ Times UTC; commit times converted from CST. Pod-count weighting: with 5 replicas
 - The analysis starts about 1 s after the canary ReplicaSet is created, because the stub is Ready almost instantly (the real vLLM needs about 61 s to load).
 - Failed analyses stop at the first failing probe, so no run shows probe 2 or 3.
 - Both Services select the stable pod-template hash when no rollout is running (verified: `cd754d6f7` for 2 minutes).
-- Verbs used and their order: TODO (from shell history).
+- Verbs used and their order on the stub: not recorded (the shell history search found nothing).
 
 ## Host reboot recovery (2026-11-15, unplanned)
 
