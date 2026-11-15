@@ -91,25 +91,12 @@ Times are local (CST, UTC-6) unless marked UTC.
 ## 12. Pod refused after a host reboot (UnexpectedAdmissionError)
 
 - **Symptom:** after the host restarted, the old vLLM pod showed `UnexpectedAdmissionError`; a replacement pod came up normally.
-- **Cause (likely):** the kubelet re-admitted the pod before the NVIDIA device plugin had registered the GPU, so the GPU request could not be satisfied. Not verified from logs.
+- **Cause (likely):** the kubelet re-admitted the pod before the NVIDIA device plugin had registered the GPU. Not verified from logs.
 - **Fix:** the ReplicaSet created a replacement once the plugin was ready; I deleted the stale pod. Recovery to Ready was 3 m 33 s after boot.
 
 ## 13. Storage outage hid inside ContainerCreating
 
-- **Symptom:** after a pod restart with the NFS server stopped, the endpoint was down for about 5 minutes and the pod sat in `ContainerCreating` with 0 restarts and no FailedMount event.
-- **Evidence:** the kubelet log on the node showed `unmounted volumes=[models] ... context deadline exceeded` 2 m 03 s after volume setup began, then the pod started after NFS returned.
-- **Lesson:** a hung dependency is quiet. A "pod pending too long" alert would catch it; restart counts and crash-loop alerts would not.
-- **Prevention:** keep model weights on node-local disk or copy them at pod start, and keep a spare replica.
-
-## 12. Pod refused after a host reboot (UnexpectedAdmissionError)
-
-- **Symptom:** after the host restarted, the old vLLM pod showed `UnexpectedAdmissionError`; a replacement pod came up normally.
-- **Cause (likely):** the kubelet re-admitted the pod before the NVIDIA device plugin had registered the GPU, so the GPU request could not be satisfied. Not verified from logs.
-- **Fix:** the ReplicaSet created a replacement once the plugin was ready; I deleted the stale pod. Recovery to Ready was 3 m 33 s after boot.
-
-## 13. Storage outage hid inside ContainerCreating
-
-- **Symptom:** after a pod restart with the NFS server stopped, the endpoint was down for about 5 minutes and the pod sat in `ContainerCreating` with 0 restarts and no FailedMount event.
-- **Evidence:** the kubelet log on the node showed `unmounted volumes=[models] ... context deadline exceeded` 2 m 03 s after volume setup began, then the pod started after NFS returned.
-- **Lesson:** a hung dependency is quiet. A "pod pending too long" alert would catch it; restart counts and crash-loop alerts would not.
+- **Symptom:** with the NFS server stopped, a restarted vLLM pod sat in `ContainerCreating` for about 4 minutes with 0 restarts and no FailedMount event; the endpoint was down for about 5 minutes.
+- **Evidence:** the node's kubelet log showed `unmounted volumes=[models] ... context deadline exceeded` 2 m 03 s after volume setup began.
+- **Lesson:** a hung dependency is quiet. A "pod pending too long" alert would catch it; restart-count alerts would not.
 - **Prevention:** keep model weights on node-local disk or copy them at pod start, and keep a spare replica.
