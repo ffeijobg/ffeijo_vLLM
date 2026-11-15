@@ -56,7 +56,7 @@ Before the fix, the stale rule did not fire at all when the prober was gone: a m
 - [x] Burn-rate alert clear time: 4 m 40 s after the pod was 1/1 (experiment A)
 - [x] Stale alert clear time: within about 10 s of the pod being 1/1 (first successful probe)
 - [x] Blue-green gate timings: recorded in the rollout section above (the PostSync hook bad-release test was not run separately)
-- [x] Load-test knee: queueing from about 20 users (details in the load test section; tokens per second TODO)
+- [x] Load-test knee: queueing from about 20 users (details in the load test section; about 1,080 tokens per second at saturation)
 - [ ] Warm restart to Ready (NFS cache warm)
 
 ## Open items
@@ -176,7 +176,7 @@ Times UTC; commit times converted from CST. Pod-count weighting: with 5 replicas
 
 - 2,542 requests, 0 failed. Request time: median 853 ms, p90 916 ms, p95 925 ms, max 956 ms (min 48.6 ms: some completions ended early).
 - vLLM `waiting` was 0 in every 10 s sample; `running` peaked at 10 in the samples (limit `--max-num-seqs 16`).
-- The server was not saturated at 16 VUs, so run 1 did not find the knee. Peak prometheus values: TODO (paste from the queries).
+- The server was not saturated at 16 VUs, so run 1 did not find the knee. Peak Prometheus values were not queried for run 1; see the run 2 and 3 table below.
 
 ## Load test (k6, 64-token chat completions through a port-forward, `--max-num-seqs 16`)
 
@@ -193,6 +193,22 @@ Times UTC; commit times converted from CST. Pod-count weighting: with 5 replicas
 - Probe availability stayed 100% throughout: probes count as ok within a 5 s budget, and the slowest request was 3.5 s. Latency broke the target while availability did not.
 - Empty completions: 3 of 8,126 (run 2) and 2 of 8,112 (run 3). The logged body shows HTTP 200, empty content and finish_reason "stop": the model emitted its end-of-sequence token first. A model behavior, not a server error.
 - k6 exited 99: the 2 s p95 threshold crossed by design.
-- p95 first above 2 s at about TODO VUs (from the knee script). Tokens per second: TODO.
+- Time-to-first-token p95 first above its 1 s target at about 36 VUs (above 2 s at about 38 VUs); queueing began at about 18 to 20 VUs; saturated throughput about 19 requests per second and about 1,080 tokens per second (about 57 tokens per response).
 - Run 3 reproduced run 2 within about 1% (p95 3.12 s against 3.14 s, 16.87 against 16.91 req/s). Queueing again started at about 20 to 21 concurrent users (first `waiting` sample above 0 at about 1 m 40 s); the queue peaked at 43 waiting near 61 users.
 - A queueing estimate (derived, not measured) explains the p95: about 43 waiting at about 19 requests per second is about 2.3 s of waiting, plus about 0.85 s of service, which matches 3.1 s. Time-to-first-token carries the delay; inter-token latency stays flat.
+
+### Load test peaks (10-minute window around each run; run 2 and run 3)
+
+| Measure | Run 2 | Run 3 |
+| --- | --- | --- |
+| Peak running / waiting | 16 / 45 | 16 / 42 |
+| Peak throughput (req/s) | 19.07 | 18.91 |
+| Tokens per second at saturation | 1,081 | 1,082 |
+| KV cache peak, preemptions | 7.7%, 0 | 7.5%, 0 |
+| GPU utilization, GPU memory | 100%, 1342 MiB | 100%, 1342 MiB |
+| p95 inter-token latency (peak) | 26 ms | 27 ms |
+| Probe errors, LLM alerts | 0, none | 0, none |
+
+- Knee: queueing from about 18 to 20 VUs; TTFT p95 above 1 s at about 36 VUs and above 2 s at about 38 VUs.
+- Cross-check (Little's law): 16 requests in flight at about 18.9 requests per second is about 0.85 s per request, matching run 1's measured median.
+- vLLM's histogram-based end-to-end p95 peak (4.87 s) exceeds k6's maximum request time (3.54 s), so it is inflated by coarse histogram buckets. Use k6's figures for end-to-end time.

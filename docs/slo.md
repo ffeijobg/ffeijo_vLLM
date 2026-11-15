@@ -18,7 +18,7 @@ Measured from outside by `llm-prober` (a real chat completion every 15 s) and fr
 | Queue depth | average `vllm:num_requests_waiting`, 5 m | under 5 | 0 |
 | GPU memory used | DCGM FB_USED over FB_USED plus FB_FREE | under 95% | 78% |
 
-Load-test knee: queueing began at about 20 concurrent users (batch cap `--max-num-seqs 16`); request p95 rose from 0.93 s at 16 users to 3.14 s at 64, with no failed requests. p95 first above 2 s: TODO.
+Load-test knee: queueing began at about 20 concurrent users (batch cap `--max-num-seqs 16`); request p95 rose from 0.93 s at 16 users to 3.14 s at 64, with no failed requests. time-to-first-token p95 first above its 1 s target at about 36 VUs (above 2 s at about 38 VUs).
 
 ## 3. Error budget
 
