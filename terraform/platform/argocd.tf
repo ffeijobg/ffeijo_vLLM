@@ -24,7 +24,7 @@ resource "kubernetes_manifest" "vllm_app" {
 
       # new: tolerate the selector the Rollouts controller writes onto the Service
       ignoreDifferences = [
-        { group = "", kind = "Service", jsonPointers = ["/spec/selector"] }
+        { kind = "Service", jsonPointers = ["/spec/selector"] }
       ]
 
       syncPolicy = {
@@ -50,6 +50,28 @@ resource "kubernetes_manifest" "prober_app" {
       syncPolicy = {
         automated   = { prune = true, selfHeal = true }
         syncOptions = ["CreateNamespace=true"]
+      }
+    }
+  }
+}
+
+resource "kubernetes_manifest" "rollouts_demo_app" {
+  depends_on = [helm_release.argocd, helm_release.argo_rollouts]
+  manifest = {
+    apiVersion = "argoproj.io/v1alpha1"
+    kind       = "Application"
+    metadata   = { name = "rollouts-demo", namespace = "argocd" }
+    spec = {
+      project     = "default"
+      source      = { repoURL = var.gitops_repo, targetRevision = "main", path = "gitops/rollouts-demo" }
+      destination = { server = "https://kubernetes.default.svc", namespace = "rollouts-demo" }
+      ignoreDifferences = [
+        { kind = "Service", jsonPointers = ["/spec/selector"] }
+      ]
+      syncPolicy = {
+        automated   = { prune = true, selfHeal = true }
+        syncOptions = ["CreateNamespace=true", "RespectIgnoreDifferences=true"]
+        retry       = { limit = 5, backoff = { duration = "5s", factor = 2, maxDuration = "3m" } }
       }
     }
   }
