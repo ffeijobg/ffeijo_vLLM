@@ -193,7 +193,7 @@ Times UTC; commit times converted from CST. Pod-count weighting: with 5 replicas
 - Probe availability stayed 100% throughout: probes count as ok within a 5 s budget, and the slowest request was 3.5 s. Latency broke the target while availability did not.
 - Empty completions: 3 of 8,126 (run 2) and 2 of 8,112 (run 3). The logged body shows HTTP 200, empty content and finish_reason "stop": the model emitted its end-of-sequence token first. A model behavior, not a server error.
 - k6 exited 99: the 2 s p95 threshold crossed by design.
-- Time-to-first-token p95 first above its 1 s target at about 36 VUs (above 2 s at about 38 VUs); queueing began at about 18 to 20 VUs; saturated throughput about 19 requests per second and about 1,080 tokens per second (about 57 tokens per response).
+- Time-to-first-token p95 first above its 1 s target at about 36 VUs (a 2 s TTFT crossing is not reliable: the histogram buckets jump from 1.0 to 2.5 s); queueing began at about 18 to 20 VUs; saturated throughput about 19 requests per second and about 1,080 tokens per second (about 57 tokens per response).
 - Run 3 reproduced run 2 within about 1% (p95 3.12 s against 3.14 s, 16.87 against 16.91 req/s). Queueing again started at about 20 to 21 concurrent users (first `waiting` sample above 0 at about 1 m 40 s); the queue peaked at 43 waiting near 61 users.
 - A queueing estimate (derived, not measured) explains the p95: about 43 waiting at about 19 requests per second is about 2.3 s of waiting, plus about 0.85 s of service, which matches 3.1 s. Time-to-first-token carries the delay; inter-token latency stays flat.
 
@@ -209,6 +209,7 @@ Times UTC; commit times converted from CST. Pod-count weighting: with 5 replicas
 | p95 inter-token latency (peak) | 26 ms | 27 ms |
 | Probe errors, LLM alerts | 0, none | 0, none |
 
-- Knee: queueing from about 18 to 20 VUs; TTFT p95 above 1 s at about 36 VUs and above 2 s at about 38 VUs.
+- Knee: queueing from about 18 to 20 VUs; TTFT p95 above 1 s at about 36 VUs ; a 2 s TTFT crossing is not reliable because the buckets jump from 1.0 to 2.5 s. End-to-end p95 above 2 s at about 38 VUs is reliable (bucket edges at 2.0 and 2.5 s).
 - Cross-check (Little's law): 16 requests in flight at about 18.9 requests per second is about 0.85 s per request, matching run 1's measured median.
 - vLLM's histogram-based end-to-end p95 peak (4.87 s) exceeds k6's maximum request time (3.54 s), so it is inflated by coarse histogram buckets. Use k6's figures for end-to-end time.
+- Histogram bucket edges (verified on vLLM v0.33.0): time to first token `0.001 ... 0.75, 1.0, 2.5, 5.0, 7.5, 10 ...`; end-to-end `... 1.5, 2.0, 2.5, 5.0, 10 ...`. A p95 inside a wide bucket is only known to lie in that bucket, so the TTFT plateau means "above 1 s and at most 2.5 s", and the end-to-end p95 estimate (4.87 s) overstates k6's measured 3.12 s.
